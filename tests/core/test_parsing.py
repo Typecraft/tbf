@@ -494,24 +494,26 @@ class TestWriter(object):
         writer._write_attrs()
 
         # All chunks will be full
-        assert output.getvalue() == b'\x05' \
-                                    b'\x00\x00\x00\x03' \
-                                    b'\x0B' \
-                                    b'\x00\x00\x00\x00' \
-                                    b'key1\x00' \
-                                    b'val2\x00' \
-                                    b'\x0D' \
-                                    b'\x0B' \
-                                    b'\x00\x00\x00\x01' \
-                                    b'key3\x00' \
-                                    b'val\x00\x00' \
-                                    b'\x0D' \
-                                    b'\x0B' \
-                                    b'\x00\x00\x00\x01' \
-                                    b'key4\x00' \
-                                    b'\x00val2\x00' \
-                                    b'\x0D' \
-                                    b'\x06'
+        # The ordering may vary, so we simply that the correct chunks are there.
+        output_value = output.getvalue()
+        assert b'\x05' \
+               b'\x00\x00\x00\x03' in output_value
+        assert b'\x0B' \
+               b'\x00\x00\x00\x00' \
+               b'key1\x00' \
+               b'val2\x00' \
+               b'\x0D' in output_value
+        assert b'\x0B' \
+               b'\x00\x00\x00\x01' \
+               b'key3\x00' \
+               b'val\x00\x00' \
+               b'\x0D' in output_value
+        assert b'\x0B' \
+               b'\x00\x00\x00\x01' \
+               b'key4\x00' \
+               b'\x00val2\x00' \
+               b'\x0D'in output_value
+        assert b'\x06' in output_value[-1:]
 
 
 class TestFrontendMethods(object):
