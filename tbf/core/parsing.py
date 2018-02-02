@@ -303,3 +303,41 @@ class _Parser(object):
             temp += _next
         return temp
 
+
+def _parse_binary_form(stream):
+    return _Parser(stream).parse()
+
+
+def _write_binary_form(document, output_stream):
+    return _Writer(document, output_stream).write()
+
+
+# FRONTEND METHODS #
+def parse_from_string(string, encoding="utf-8"):
+    return parse_from_bytes(string.encode(encoding))
+
+
+def parse_from_bytes(bytes):
+    return _parse_binary_form(io.BytesIO(bytes))
+
+
+def parse(filepath_or_fp):
+    with open(filepath_or_fp, 'rb') as f:
+        return _parse_binary_form(f)
+
+
+def write(document, output_stream):
+    assert isinstance(document, Document)
+
+    return _write_binary_form(document, output_stream)
+
+
+def write_to_bytes(document):
+    output = io.BytesIO()
+    _write_binary_form(document, output)
+    return output.getvalue()
+
+
+def write_to_string(document, encoding="utf-8"):
+    return write_to_bytes(document).decode(encoding)
+
