@@ -18,7 +18,7 @@ deploy:
       QUk1TmY5M2dmYnNLTHFDdDhESmZ1bkEzN0RtcmVOMWtjaVd5RTJPQURUeFNKSXRaUCtNeG5zTVRq
       Z1A1K0JieVVmZ3NaekovalpEK3A4K0l5Qm9vUVhIbmZYaml6UGFiclNubUtwa3dyUm51enB4VWc9
   true:
-    python: 2.7
+    python: 3.6
     repo: Typecraft/tbf
     tags: true
 install: pip install -U tox-travis
@@ -26,5 +26,4 @@ language: python
 python:
 - 3.6
 - 3.4
-- 2.7
 script: tox
