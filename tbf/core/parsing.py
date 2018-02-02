@@ -156,3 +156,150 @@ class _Writer(object):
     @classmethod
     def _ord_to_bytes(cls, flag):
         return chr(flag).encode()
+
+
+class _Parser(object):
+    def __init__(self, stream):
+        self.stream = io.BufferedReader(stream)  # Grants access to e.g. peek
+        self.document = Document()
+        self.encoding = 'utf-8'
+
+        self._temp_layers = []
+        self._temp_layer_objects = {}
+
+    def parse(self):
+        self._parse_header()
+        self._parse_layers()
+        self._parse_relations()
+        self._parse_attrs()
+
+        return self.document
+
+    def _parse_header(self):
+        self._expect(HEADER_START)
+        encoding = self._eat_until_sep().decode()
+
+        header = Header(encoding=encoding)
+        self.encoding = encoding
+        self.document.header = header
+
+        self._expect(HEADER_END)
+
+    def _parse_layers(self):
+        self._expect(LAYERS_START)
+        number_of_layers = self._read_as_int(4)
+        for i in range(number_of_layers):
+            self._parse_layer(i)
+
+        self._expect(LAYERS_END)
+
+    def _parse_layer(self, _id):
+        self._expect(LAYER_START)
+        name = self._eat_until_sep().decode(self.encoding)
+        number_of_entities = self._read_as_int(4)
+
+        objects = [LayerObject(i, _id) for i in range(number_of_entities)]
+        layer = Layer(_id, name, objects)
+        self.document.add_layer(layer)
+        self._temp_layers.append(layer)
+        self._temp_layer_objects[_id] = objects
+
+        self._expect(LAYER_END)
+
+    def _parse_relations(self):
+        self._expect(RELATIONS_START)
+        number_of_relations = self._read_as_int(4)
+        for i in range(number_of_relations):
+            self._parse_relation()
+
+        self._expect(RELATIONS_END)
+
+    def _parse_relation(self):
+        self._expect(RELATION_START)
+        parent_layer = self._read_as_int(4)
+        children_layer = self._read_as_int(4)
+        num_of_pairs = self._read_as_int(4)
+
+        for i in range(num_of_pairs):
+            parent = self._read_as_int(4)
+            child = self._read_as_int(4)
+
+            # TODO, add explicit checks and error reporting
+            parent_object = self._temp_layer_objects[parent_layer][parent]
+            child_object = self._temp_layer_objects[children_layer][child]
+
+            parent_object.add_child(child_object)
+
+        self._expect(RELATION_END)
+
+    def _parse_attrs(self):
+        self._expect(ATTRS_START)
+        num_of_chunks = self._read_as_int(4)
+        for i in range(num_of_chunks):
+            self._parse_chunk()
+
+        self._expect(ATTRS_END)
+
+    def _parse_chunk(self):
+        _next = self._peek_as_int()
+        if _next == CHUNK_FULL_START:
+            self._parse_full_chunk()
+        elif _next == CHUNK_LINKED_START:
+            self._parse_linked_chunk()
+        else:
+            raise TBFParsingException("Expected CHUNK_FULL_START or CHUNK_LINKED_START, got %d" % _next)
+
+    def _parse_full_chunk(self):
+        self._expect(CHUNK_FULL_START)
+        layer_id = self._read_as_int(4)
+        attr_name = self._eat_until_sep().decode(self.encoding)
+        for layer_object in self._temp_layer_objects[layer_id]:
+            value = self._eat_until_sep()
+            layer_object.set_attr(attr_name, value)
+
+        self._expect(CHUNK_END)
+
+    def _parse_linked_chunk(self):
+        self._expect(CHUNK_LINKED_START)
+        layer_id = self._read_as_int(4)
+        attr_name = self._eat_until_sep().decode(self.encoding)
+        num_of_entries = self._read_as_int(4)
+
+        for i in range(num_of_entries):
+            object_id = self._read_as_int(4)
+            value = self._eat_until_sep()
+
+            layer_object = self._temp_layer_objects[layer_id][object_id]
+            layer_object.set_attr(attr_name, value)
+
+        self._expect(CHUNK_END)
+
+    def _read(self, length=1):
+        return self.stream.read(length)
+
+    def _read_as_int(self, length=1):
+        return int.from_bytes(self.stream.read(length), byteorder='big')
+
+    def _read_as_str(self, length=1):
+        return self.stream.read(length).decode(self.encoding)
+
+    def _peek(self, length=1):
+        return self.stream.peek(length)[:length]
+
+    def _peek_as_int(self, length=1):
+        return int.from_bytes(self.stream.peek(length)[:length], byteorder='big')
+
+    def _expect(self, byte):
+        _next = ord(self._read())
+        if _next != byte:
+            raise TBFParsingException("Expected %d, got %d" % (byte, _next))
+
+    def _eat_until_sep(self):
+        temp = b''
+        while True:
+            _next = self._read()
+            if _next == b'' or ord(_next) == SEPARATOR:
+                break
+            temp += _next
+        return temp
+
